@@ -1,0 +1,44 @@
+name: Fix Streamlit navigation
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-navigation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch navigation state handling
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app.py')
+          text = path.read_text(encoding='utf-8')
+          old = '    page = st.radio("Navigation", ["Dashboard", "Skill Tree", "Lesson Lab", "Projects", "Practice Arena", "Job Readiness"], key="page")'
+          new = '''    pages = ["Dashboard", "Skill Tree", "Lesson Lab", "Projects", "Practice Arena", "Job Readiness"]
+    page = st.radio(
+        "Navigation",
+        pages,
+        index=pages.index(st.session_state.page) if st.session_state.page in pages else 0,
+        key="navigation_page",
+    )
+    if page != st.session_state.page:
+        st.session_state.page = page'''
+          if old not in text:
+              raise SystemExit('Target navigation line not found; no changes made.')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.py
+          git diff --cached --quiet || git commit -m "Fix Streamlit navigation state mutation"
+          git push
