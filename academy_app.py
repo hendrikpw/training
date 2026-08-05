@@ -267,6 +267,7 @@ st.markdown("""
 
 with st.sidebar:
     st.title("🧠 AI Academy")
+    st.caption("Build 2026-08-05.3")
     page = st.radio("Navigation", ["Dashboard", "Skill Tree", "Lesson Lab", "Projects", "Practice Arena", "Job Readiness"], key="navigation_page")
     level, current_xp, next_xp = get_level(st.session_state.progress["xp"])
     st.divider()

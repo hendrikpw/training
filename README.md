@@ -42,5 +42,8 @@ Die drei Lernphasen sind absichtlich miteinander verbunden: Jede Quizfrage verwe
 ## Tests
 
 ```bash
+pip install -r requirements-dev.txt
 python -m pytest -q
 ```
+
+Der Sidebar-Buildstempel zeigt, ob das aktuelle Deployment geladen wurde. Unerwartete Laufzeitfehler werden im Einstiegspunkt abgefangen und mit Fehler-ID sowie Traceback in der App sichtbar gemacht; dadurch bleibt die eigentliche Ursache auch ohne Zugriff auf die Cloud-Konsole diagnostizierbar.
