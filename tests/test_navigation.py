@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import lesson_content
 from streamlit.testing.v1 import AppTest
 
 
@@ -78,3 +79,26 @@ def test_correct_chapter_check_unlocks_the_next_chapter_without_widget_error() -
     assert not app.exception
     chapter = next(selectbox for selectbox in app.selectbox if selectbox.label == "Kapitel auswählen")
     assert chapter.value == 1
+
+
+def test_hot_reload_refreshes_a_stale_curriculum_module(monkeypatch) -> None:
+    """A Cloud hot update must not mix a new UI with an old lesson schema."""
+    monkeypatch.setattr(
+        lesson_content,
+        "build_lesson_lab",
+        lambda _lesson: {
+            "objectives": ["stale"],
+            "sections": [{"id": "old", "title": "Old", "body": "old"}],
+            "quiz": [],
+            "debug": {},
+            "build": {},
+        },
+    )
+
+    app = AppTest.from_file(APP_PATH, default_timeout=30)
+    app.session_state["navigation_page"] = "Lesson Lab"
+    app.session_state["progress"] = fresh_progress()
+    app.run()
+
+    assert not app.exception
+    assert next(metric for metric in app.metric if metric.label == "Ausführliche Kapitel").value == "10"

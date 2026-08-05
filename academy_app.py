@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import importlib
 import json
 import subprocess
 import sys
@@ -13,7 +14,14 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from lesson_content import build_lesson_lab, validate_labs
+import lesson_content as curriculum
+
+# Streamlit Community Cloud hot-reloads the entrypoint without necessarily
+# restarting the Python process. Reload the curriculum explicitly so a UI
+# update can never run against an older cached chapter schema.
+curriculum = importlib.reload(curriculum)
+build_lesson_lab = curriculum.build_lesson_lab
+validate_labs = curriculum.validate_labs
 
 APP_DIR = Path(__file__).parent
 PROGRESS_FILE = APP_DIR / "progress.json"
@@ -318,7 +326,7 @@ st.markdown("""
 
 with st.sidebar:
     st.title("🧠 AI Academy")
-    st.caption("Build 2026-08-05.4")
+    st.caption("Build 2026-08-05.5")
     page = st.radio("Navigation", ["Dashboard", "Skill Tree", "Lesson Lab", "Projects", "Practice Arena", "Job Readiness"], key="navigation_page")
     level, current_xp, next_xp = get_level(st.session_state.progress["xp"])
     st.divider()
