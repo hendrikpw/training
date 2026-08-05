@@ -136,6 +136,7 @@ CURRICULUM_ERRORS = validate_labs(TRACKS)
 for _track in TRACKS:
     for _lesson in _track["lessons"]:
         _lesson["lab"] = build_lesson_lab(_lesson)
+        _lesson["minutes"] = sum(section["minutes"] for section in _lesson["lab"]["sections"])
 
 PROJECTS = [
     {"title":"1. Support Ticket Classifier","level":"Foundation","deliverables":["REST-API", "validiertes Ausgabe-Schema", "Unit Tests", "Metrik-Report"],"skills":["Python","APIs","ML/Evals"]},
@@ -154,7 +155,8 @@ BADGES = [
 
 DEFAULT_PROGRESS = {
     "completed": [], "quiz_correct": [], "challenge_correct": [], "xp": 0,
-    "streak": 0, "last_active": None, "notes": {}, "projects": {}
+    "streak": 0, "last_active": None, "notes": {}, "projects": {},
+    "lesson_started": [], "chapter_completed": []
 }
 
 
@@ -237,6 +239,51 @@ def run_python(code: str, tests: str) -> tuple[bool, str]:
         return False, f"Code konnte nicht ausgeführt werden: {exc}"
 
 
+def render_practice_lab(key: str, lab: dict[str, Any], section_titles: dict[str, str]) -> None:
+    """Render the applied phase after theory and quiz have been completed."""
+    debug_tab, build_tab = st.tabs(["🧯 Debug Lab", "🏗️ Build Mission"])
+    with debug_tab:
+        debug = lab["debug"]
+        st.markdown(f"<span class='source-link'>↩ Learn · {section_titles[debug['source']]}</span>", unsafe_allow_html=True)
+        st.subheader("Vom Symptom zur belastbaren Korrektur")
+        st.markdown("**Kaputtes Artefakt**")
+        st.markdown(debug["snippet"])
+        st.error(debug["symptom"])
+        st.write(debug["task"])
+        st.text_area("Deine korrigierte Version", height=220, key=f"debug-fix-{key}", placeholder="Ändere Code, Konfiguration oder Ablauf so, dass die Ursache behoben wird …")
+        st.text_area("Ursache, Fix und Regressionstest", height=150, key=f"debug-reason-{key}", placeholder="1. Ursache …\n2. Korrektur …\n3. So beweise ich den Fix …")
+        st.markdown("**Self-check vor der Musterlösung**")
+        checks = [st.checkbox(item, key=f"debug-check-{key}-{i}") for i, item in enumerate(debug["checkpoints"])]
+        if st.button("Musterlösung freischalten", key=f"debug-solution-{key}", disabled=not all(checks)):
+            st.session_state[f"show-debug-solution-{key}"] = True
+        if st.session_state.get(f"show-debug-solution-{key}"):
+            st.success("Mögliche belastbare Lösung: " + debug["expected"])
+            completion_key = f"{key}::debug"
+            if completion_key not in st.session_state.progress["challenge_correct"]:
+                st.session_state.progress["challenge_correct"].append(completion_key)
+                st.session_state.progress["xp"] += 20
+                save_progress()
+    with build_tab:
+        build = lab["build"]
+        st.subheader(build["title"])
+        st.markdown(build["brief"])
+        st.markdown("#### Arbeitsauftrag in fünf Stufen")
+        for step_index, step in enumerate(build["steps"], start=1):
+            st.markdown(f"**{step_index}.** {step}")
+        st.info("Abgabeformat: " + build["deliverable"])
+        st.text_area("Dein Artefakt / deine Lösung", height=300, key=f"mission-{key}", placeholder="Arbeite die fünf Stufen sichtbar ab …")
+        st.markdown("#### Abnahme-Rubrik")
+        rubric_checks = [st.checkbox(item, key=f"build-rubric-{key}-{i}") for i, item in enumerate(build["rubric"])]
+        st.progress(sum(rubric_checks) / len(rubric_checks), text=f"{sum(rubric_checks)}/{len(rubric_checks)} Kriterien erfüllt")
+        if all(rubric_checks):
+            st.success("Die Mission erfüllt die Engineering-Rubrik. Sichere dein Artefakt in den Notizen oder einem eigenen Repository.")
+            completion_key = f"{key}::build"
+            if completion_key not in st.session_state.progress["challenge_correct"]:
+                st.session_state.progress["challenge_correct"].append(completion_key)
+                st.session_state.progress["xp"] += 30
+                save_progress()
+
+
 if "progress" not in st.session_state:
     st.session_state.progress = load_progress()
     update_streak()
@@ -257,6 +304,10 @@ st.markdown("""
 .card {padding: 1.2rem; border: 1px solid rgba(148,163,184,.18); border-radius: 18px; background: rgba(21,28,50,.72); min-height: 150px;}
 .lesson-card {padding: 1rem; border-left: 4px solid #8B5CF6; border-radius: 12px; background: rgba(21,28,50,.75); margin-bottom: .65rem;}
 .objective-card {padding:.9rem 1rem; border-radius:14px; background:rgba(14,165,233,.08); border:1px solid rgba(14,165,233,.22); height:100%;}
+.syllabus-card {padding:1rem 1.1rem; border-radius:14px; background:rgba(21,28,50,.62); border:1px solid rgba(148,163,184,.16); margin-bottom:.7rem;}
+.chapter-shell {padding:1.2rem 1.35rem; border-radius:18px; background:rgba(8,12,24,.45); border:1px solid rgba(139,92,246,.24);}
+.chapter-kicker {color:#a78bfa; font-size:.78rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase;}
+.takeaway-card {padding:.8rem 1rem; border-radius:12px; background:rgba(34,197,94,.07); border:1px solid rgba(34,197,94,.2); margin:.35rem 0;}
 .source-link {display:inline-block; color:#c4b5fd; background:rgba(139,92,246,.12); border:1px solid rgba(139,92,246,.25); padding:.15rem .5rem; border-radius:999px; font-size:.78rem; margin-bottom:.45rem;}
 .status-ok {padding:.8rem 1rem; border-radius:14px; background:rgba(34,197,94,.08); border:1px solid rgba(34,197,94,.25);}
 .badge {display:inline-block; padding:.25rem .65rem; border-radius:999px; background:rgba(139,92,246,.18); border:1px solid rgba(139,92,246,.35); margin:.15rem; font-size:.8rem;}
@@ -267,7 +318,7 @@ st.markdown("""
 
 with st.sidebar:
     st.title("🧠 AI Academy")
-    st.caption("Build 2026-08-05.3")
+    st.caption("Build 2026-08-05.4")
     page = st.radio("Navigation", ["Dashboard", "Skill Tree", "Lesson Lab", "Projects", "Practice Arena", "Job Readiness"], key="navigation_page")
     level, current_xp, next_xp = get_level(st.session_state.progress["xp"])
     st.divider()
@@ -309,7 +360,7 @@ if page == "Dashboard":
             st.write(t["description"])
             st.caption(f"{l['difficulty']} · {l['minutes']} Min · +{l['xp']} XP")
         with col2:
-            if st.button("Mission starten", type="primary", use_container_width=True):
+            if st.button("Mission starten", type="primary", width="stretch"):
                 st.session_state.selected_lesson = lesson_key(t,l)
                 st.session_state.pending_navigation = "Lesson Lab"
                 st.rerun()
@@ -324,7 +375,7 @@ if page == "Dashboard":
     df = pd.DataFrame(rows)
     fig = px.bar(df, x="Fortschritt", y="Track", orientation="h", text=df["Fortschritt"].map(lambda x:f"{x:.0%}"), range_x=[0,1])
     fig.update_layout(height=450, margin=dict(l=0,r=0,t=10,b=0), showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     st.subheader("Badges")
     for name, threshold, desc in BADGES:
@@ -347,7 +398,7 @@ elif page == "Skill Tree":
                     st.markdown(f"**{status} {lesson['title']}**  ")
                     st.caption(f"{lesson['difficulty']} · {lesson['minutes']} Min · {lesson['xp']} XP")
                 with c2:
-                    if st.button("Öffnen", key=f"open-{key}", use_container_width=True):
+                    if st.button("Öffnen", key=f"open-{key}", width="stretch"):
                         st.session_state.selected_lesson = key
                         st.session_state.pending_navigation = "Lesson Lab"
                         st.rerun()
@@ -375,82 +426,187 @@ elif page == "Lesson Lab":
 
     tab1, tab2, tab3, tab4 = st.tabs(["📖 Learn", "🧠 Quiz", "🛠️ Debug & Build", "📝 Notes"])
     with tab1:
-        st.subheader("Das kannst du nach dieser Lektion")
-        objective_columns = st.columns(min(3, len(lab["objectives"])))
-        for index, objective in enumerate(lab["objectives"]):
-            with objective_columns[index % len(objective_columns)]:
-                st.markdown(f"<div class='objective-card'><b>0{index + 1}</b><br>{objective}</div>", unsafe_allow_html=True)
-        st.divider()
-        st.subheader("Geführter Lernpfad")
-        st.caption("Die Kapitel bilden die Wissensbasis für Quiz, Debug Lab und Build Mission. Verweise in den Aufgaben führen zu genau diesen Abschnitten zurück.")
-        for section_index, section in enumerate(lab["sections"]):
-            with st.expander(section["title"], expanded=section_index == 0):
-                st.markdown(section["body"])
-                st.caption(f"Kapitel-ID: {section['id']}")
-        st.info("Engineer-Mindset: Erst Vertrag und erwartetes Verhalten verstehen, dann Failure Modes benennen, danach implementieren und mit einem beobachtbaren Test verifizieren.")
+        chapter_completion = set(st.session_state.progress["chapter_completed"])
+        completed_chapters = [
+            section for section in lab["sections"]
+            if f"{key}::chapter::{section['id']}" in chapter_completion
+        ]
+        theory_complete = len(completed_chapters) == len(lab["sections"])
+        view_key = f"lesson-view::{key}"
+        chapter_widget_key = f"lesson-chapter::{key}"
+        pending_chapter_key = f"pending-lesson-chapter::{key}"
+        if view_key not in st.session_state:
+            st.session_state[view_key] = "overview"
+        if pending_chapter_key in st.session_state:
+            st.session_state[chapter_widget_key] = st.session_state.pop(pending_chapter_key)
+
+        if st.session_state[view_key] == "overview":
+            st.subheader("Lektionsübersicht")
+            st.write("Das ist die Vorschau auf die Lektion. Mit **Lektion starten** wechselst du in den ausführlichen, kapitelweisen Lernmodus.")
+            objective_columns = st.columns(min(3, len(lab["objectives"])))
+            for index, objective in enumerate(lab["objectives"]):
+                with objective_columns[index % len(objective_columns)]:
+                    st.markdown(f"<div class='objective-card'><b>0{index + 1}</b><br>{objective}</div>", unsafe_allow_html=True)
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Ausführliche Kapitel", len(lab["sections"]))
+            m2.metric("Intensive Lernzeit", f"{sum(section['minutes'] for section in lab['sections'])} Min")
+            m3.metric("Kapitel abgeschlossen", f"{len(completed_chapters)}/{len(lab['sections'])}")
+            st.progress(len(completed_chapters) / len(lab["sections"]), text="Theorie-Fortschritt")
+
+            st.subheader("Das erwartet dich")
+            for section_index, section in enumerate(lab["sections"], start=1):
+                chapter_key = f"{key}::chapter::{section['id']}"
+                status = "✅" if chapter_key in chapter_completion else "○"
+                st.markdown(
+                    f"<div class='syllabus-card'><b>{status} {section['title']}</b>"
+                    f"<br><span class='small'>{section['summary']} · ca. {section['minutes']} Minuten</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+            next_index = next(
+                (index for index, section in enumerate(lab["sections"])
+                 if f"{key}::chapter::{section['id']}" not in chapter_completion),
+                0,
+            )
+            action_label = "Lektion fortsetzen" if completed_chapters else "Lektion starten"
+            if st.button(action_label, type="primary", key=f"start-lesson-{key}", width="stretch"):
+                if key not in st.session_state.progress["lesson_started"]:
+                    st.session_state.progress["lesson_started"].append(key)
+                    save_progress()
+                st.session_state[view_key] = "player"
+                st.session_state[pending_chapter_key] = next_index
+                st.rerun()
+        else:
+            top_left, top_right = st.columns([5, 1])
+            with top_left:
+                st.subheader("Geführte Lektion")
+                st.caption("Arbeite ein Kapitel nach dem anderen durch. Ein Kapitel zählt nach bestandenem Wissenscheck als abgeschlossen.")
+            with top_right:
+                if st.button("Zur Übersicht", key=f"overview-{key}", width="stretch"):
+                    st.session_state[view_key] = "overview"
+                    st.rerun()
+
+            chapter_index = st.selectbox(
+                "Kapitel auswählen",
+                options=list(range(len(lab["sections"]))),
+                format_func=lambda index: (
+                    ("✅ " if f"{key}::chapter::{lab['sections'][index]['id']}" in chapter_completion else "○ ")
+                    + lab["sections"][index]["title"]
+                ),
+                key=chapter_widget_key,
+            )
+            section = lab["sections"][chapter_index]
+            completion_key = f"{key}::chapter::{section['id']}"
+            is_chapter_complete = completion_key in chapter_completion
+            st.progress(
+                len(completed_chapters) / len(lab["sections"]),
+                text=f"Lektionsfortschritt · {len(completed_chapters)}/{len(lab['sections'])} Kapitel",
+            )
+
+            st.markdown(
+                f"<div class='chapter-shell'><div class='chapter-kicker'>Kapitel {chapter_index + 1} von {len(lab['sections'])} · ca. {section['minutes']} Minuten</div>"
+                f"<h2>{section['title'].split('·', 1)[-1].strip()}</h2><p>{section['summary']}</p></div>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(section["body"])
+
+            st.divider()
+            st.subheader("Kernpunkte")
+            for takeaway in section["takeaways"]:
+                st.markdown(f"<div class='takeaway-card'>✓ {takeaway}</div>", unsafe_allow_html=True)
+
+            st.subheader("Aktive Anwendung")
+            st.info(section["practice"])
+            practice_key = f"chapter-practice::{key}::{section['id']}"
+            saved_practice_key = f"{key}::practice::{section['id']}"
+            practice_answer = st.text_area(
+                "Deine Ausarbeitung",
+                value=st.session_state.progress["notes"].get(saved_practice_key, ""),
+                height=180,
+                key=practice_key,
+                placeholder="Arbeite die Aufgabe so aus, dass eine zweite Person deine Entscheidung prüfen kann …",
+            )
+            if st.button("Ausarbeitung speichern", key=f"save-practice::{key}::{section['id']}"):
+                st.session_state.progress["notes"][saved_practice_key] = practice_answer
+                save_progress()
+                st.success("Ausarbeitung gespeichert.")
+
+            st.subheader("Wissenscheck")
+            check = section["check"]
+            check_answer = st.radio(
+                check["q"], check["options"], index=None,
+                key=f"chapter-check::{key}::{section['id']}",
+            )
+            if st.button("Kapitelantwort prüfen", key=f"check-chapter::{key}::{section['id']}"):
+                if check_answer is None:
+                    st.warning("Wähle zuerst eine Antwort aus.")
+                elif check["options"].index(check_answer) == check["answer"]:
+                    if completion_key not in st.session_state.progress["chapter_completed"]:
+                        st.session_state.progress["chapter_completed"].append(completion_key)
+                        st.session_state.progress["xp"] += 5
+                        save_progress()
+                    st.success("Richtig. " + check["why"])
+                    st.rerun()
+                else:
+                    st.error("Noch nicht. " + check["why"] + " Lies den relevanten Abschnitt erneut und begründe deine nächste Auswahl.")
+            if is_chapter_complete:
+                st.markdown("<div class='status-ok'><b>Kapitel gemeistert.</b> Deine Ausarbeitung bleibt gespeichert und du kannst weitergehen.</div>", unsafe_allow_html=True)
+
+            previous_col, next_col = st.columns(2)
+            with previous_col:
+                if st.button("← Vorheriges Kapitel", disabled=chapter_index == 0, key=f"previous-chapter::{key}::{section['id']}", width="stretch"):
+                    st.session_state[pending_chapter_key] = chapter_index - 1
+                    st.rerun()
+            with next_col:
+                if chapter_index + 1 < len(lab["sections"]):
+                    if st.button("Nächstes Kapitel →", disabled=not is_chapter_complete, type="primary", key=f"next-chapter::{key}::{section['id']}", width="stretch"):
+                        st.session_state[pending_chapter_key] = chapter_index + 1
+                        st.rerun()
+                elif theory_complete:
+                    st.success("Theorie vollständig abgeschlossen. Wechsle jetzt zum Quiz und anschließend ins Debug & Build Lab.")
+                else:
+                    st.warning("Schließe den Wissenscheck dieses Kapitels ab, um die Theorie zu beenden.")
     with tab2:
-        st.subheader("Verstehen, anwenden, diagnostizieren")
-        st.write("Die Fragen prüfen nicht unabhängiges Trivia: Jede Frage nennt das Learn-Kapitel, aus dem du die Antwort herleiten kannst.")
-        for question_index, q in enumerate(lab["quiz"], start=1):
-            quiz_key = f"{key}::quiz::{q['id']}"
-            with st.container(border=True):
-                st.markdown(f"<span class='source-link'>↩ Learn · {section_titles[q['source']]}</span>", unsafe_allow_html=True)
-                st.markdown(f"**Frage {question_index} von {len(lab['quiz'])}**")
-                answer = st.radio(q["q"], q["options"], key=f"quiz-answer-{quiz_key}", label_visibility="visible")
-                if st.button("Antwort prüfen", key=f"check-{quiz_key}"):
-                    idx = q["options"].index(answer)
-                    if idx == q["answer"]:
-                        st.success("Richtig. " + q["why"])
-                        if quiz_key not in st.session_state.progress["quiz_correct"]:
-                            st.session_state.progress["quiz_correct"].append(quiz_key)
-                            st.session_state.progress["xp"] += 10
-                            save_progress()
-                    else:
-                        st.error("Noch nicht. " + q["why"])
-        if answered == len(lab["quiz"]):
-            st.markdown("<div class='status-ok'><b>Quiz gemeistert.</b> Jetzt kannst du das Wissen im Debug Lab anwenden.</div>", unsafe_allow_html=True)
+        if not theory_complete:
+            st.warning(
+                f"Das Quiz wird nach dem geführten Lernpfad freigeschaltet. "
+                f"Aktuell sind {len(completed_chapters)}/{len(lab['sections'])} Kapitel abgeschlossen."
+            )
+            if st.button("Zur Lektion", key=f"back-to-learn-{key}"):
+                st.session_state[view_key] = "player"
+                st.rerun()
+        else:
+            st.subheader("Verstehen, anwenden, diagnostizieren")
+            st.write("Jede Frage verweist auf ein konkretes Kapitel. Beantworte sie aus dem mentalen Modell, nicht durch bloßes Wiedererkennen einzelner Wörter.")
+            for question_index, q in enumerate(lab["quiz"], start=1):
+                quiz_key = f"{key}::quiz::{q['id']}"
+                with st.container(border=True):
+                    st.markdown(f"<span class='source-link'>↩ Learn · {section_titles[q['source']]}</span>", unsafe_allow_html=True)
+                    st.markdown(f"**Frage {question_index} von {len(lab['quiz'])}**")
+                    answer = st.radio(q["q"], q["options"], index=None, key=f"quiz-answer-{quiz_key}", label_visibility="visible")
+                    if st.button("Antwort prüfen", key=f"check-{quiz_key}"):
+                        if answer is None:
+                            st.warning("Wähle zuerst eine Antwort aus.")
+                        elif q["options"].index(answer) == q["answer"]:
+                            st.success("Richtig. " + q["why"])
+                            if quiz_key not in st.session_state.progress["quiz_correct"]:
+                                st.session_state.progress["quiz_correct"].append(quiz_key)
+                                st.session_state.progress["xp"] += 10
+                                save_progress()
+                                st.rerun()
+                        else:
+                            st.error("Noch nicht. " + q["why"])
+            if answered == len(lab["quiz"]):
+                st.markdown("<div class='status-ok'><b>Quiz gemeistert.</b> Jetzt kannst du das Wissen im Debug Lab anwenden.</div>", unsafe_allow_html=True)
     with tab3:
-        debug_tab, build_tab = st.tabs(["🧯 Debug Lab", "🏗️ Build Mission"])
-        with debug_tab:
-            debug = lab["debug"]
-            st.markdown(f"<span class='source-link'>↩ Learn · {section_titles[debug['source']]}</span>", unsafe_allow_html=True)
-            st.subheader("Vom Symptom zur belastbaren Korrektur")
-            st.markdown("**Kaputtes Artefakt**")
-            st.markdown(debug["snippet"])
-            st.error(debug["symptom"])
-            st.write(debug["task"])
-            st.text_area("Deine korrigierte Version", height=220, key=f"debug-fix-{key}", placeholder="Ändere den Code, die Konfiguration oder den Ablauf so, dass die Ursache behoben wird …")
-            st.text_area("Ursache, Fix und Regressionstest", height=150, key=f"debug-reason-{key}", placeholder="1. Ursache …\n2. Korrektur …\n3. So beweise ich den Fix …")
-            st.markdown("**Self-check vor der Musterlösung**")
-            checks = [st.checkbox(item, key=f"debug-check-{key}-{i}") for i, item in enumerate(debug["checkpoints"])]
-            if st.button("Musterlösung freischalten", key=f"debug-solution-{key}", disabled=not all(checks)):
-                st.session_state[f"show-debug-solution-{key}"] = True
-            if st.session_state.get(f"show-debug-solution-{key}"):
-                st.success("Mögliche belastbare Lösung: " + debug["expected"])
-                completion_key = f"{key}::debug"
-                if completion_key not in st.session_state.progress["challenge_correct"]:
-                    st.session_state.progress["challenge_correct"].append(completion_key)
-                    st.session_state.progress["xp"] += 20
-                    save_progress()
-        with build_tab:
-            build = lab["build"]
-            st.subheader(build["title"])
-            st.markdown(build["brief"])
-            st.markdown("#### Arbeitsauftrag in fünf Stufen")
-            for step_index, step in enumerate(build["steps"], start=1):
-                st.markdown(f"**{step_index}.** {step}")
-            st.info("Abgabeformat: " + build["deliverable"])
-            st.text_area("Dein Artefakt / deine Lösung", height=300, key=f"mission-{key}", placeholder="Arbeite die fünf Stufen sichtbar ab …")
-            st.markdown("#### Abnahme-Rubrik")
-            rubric_checks = [st.checkbox(item, key=f"build-rubric-{key}-{i}") for i, item in enumerate(build["rubric"])]
-            st.progress(sum(rubric_checks) / len(rubric_checks), text=f"{sum(rubric_checks)}/{len(rubric_checks)} Kriterien erfüllt")
-            if all(rubric_checks):
-                st.success("Die Mission erfüllt die vollständige Engineering-Rubrik. Sichere dein Artefakt in den Notizen oder in einem eigenen Repository.")
-                completion_key = f"{key}::build"
-                if completion_key not in st.session_state.progress["challenge_correct"]:
-                    st.session_state.progress["challenge_correct"].append(completion_key)
-                    st.session_state.progress["xp"] += 30
-                    save_progress()
+        if answered != len(lab["quiz"]):
+            st.warning(
+                f"Debug Lab und Build Mission werden nach dem Quiz freigeschaltet. "
+                f"Aktuell sind {answered}/{len(lab['quiz'])} Quizfragen gemeistert."
+            )
+        else:
+            render_practice_lab(key, lab, section_titles)
     with tab4:
         note = st.text_area("Eigene Notizen", st.session_state.progress["notes"].get(key,""), height=240, key=f"notes-{key}")
         if st.button("Notizen speichern", key=f"save-note-{key}"):
@@ -460,9 +616,24 @@ elif page == "Lesson Lab":
     st.divider()
     if key in completed:
         st.success("Lektion abgeschlossen.")
-    elif st.button(f"Lektion abschließen (+{lesson['xp']} XP)", type="primary"):
-        mark_complete(track,lesson)
-        st.rerun()
+    else:
+        debug_complete = f"{key}::debug" in st.session_state.progress["challenge_correct"]
+        build_complete = f"{key}::build" in st.session_state.progress["challenge_correct"]
+        lesson_ready = theory_complete and answered == len(lab["quiz"]) and debug_complete and build_complete
+        if not lesson_ready:
+            missing = []
+            if not theory_complete:
+                missing.append("Theoriekapitel")
+            if answered != len(lab["quiz"]):
+                missing.append("Quiz")
+            if not debug_complete:
+                missing.append("Debug Lab")
+            if not build_complete:
+                missing.append("Build Mission")
+            st.caption("Noch offen: " + " · ".join(missing))
+        if st.button(f"Lektion abschließen (+{lesson['xp']} XP)", type="primary", disabled=not lesson_ready):
+            mark_complete(track,lesson)
+            st.rerun()
 
 elif page == "Projects":
     st.title("Portfolio Questline")
@@ -529,7 +700,7 @@ elif page == "Job Readiness":
     fig=px.line_polar(df, r="Score", theta="Skill", line_close=True, range_r=[0,100])
     fig.update_traces(fill="toself")
     fig.update_layout(height=520, paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig,use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
     weakest=df.sort_values("Score").iloc[0]
     st.info(f"Nächster Fokus: **{weakest['Skill']}** ({weakest['Score']:.0f}%).")
     st.subheader("Job-ready Checklist")

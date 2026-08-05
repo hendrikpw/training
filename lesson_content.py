@@ -293,6 +293,225 @@ LESSON_BLUEPRINTS: dict[str, dict[str, Any]] = {
 }
 
 
+# Role-specific depth that turns the shared pedagogical structure into an
+# individual professional lesson.  These notes are deliberately concrete:
+# learners should know where the topic sits in a production system, which
+# telemetry proves that it works, and what artifact they could discuss in an
+# interview or code review.
+LESSON_EXTENSIONS: dict[str, dict[str, Any]] = {
+    "python": {
+        "career": "AI Engineers spend a large part of their time on ordinary Python: contracts, transformations, provider adapters, tests and failure handling. Model quality cannot compensate for brittle application code.",
+        "architecture": "Keep pure transformations separate from file, network and model access. Typed boundary models enter the application layer; small functions transform them; adapters own side effects.",
+        "signals": ["exception rate by function and input class", "type- and schema-validation failures", "unit-test coverage of boundary cases", "runtime and memory for batch transformations"],
+        "evidence": ["table-driven unit tests", "property test for invariants", "static type-check result", "one regression test for every repaired bug"],
+        "interview": "Implement a small transformation, state its contract aloud, cover empty and invalid input, and explain why the function does not mutate caller-owned data.",
+    },
+    "git_api": {
+        "career": "Almost every AI product integrates model, data and business services over HTTP. Robust clients and disciplined Git changes determine whether those integrations remain operable under rate limits and partial outages.",
+        "architecture": "Place transport details in a client adapter. Convert HTTP responses into typed domain results so the rest of the application does not branch on raw status codes everywhere.",
+        "signals": ["request rate and status-code distribution", "p50/p95/p99 latency", "retry count and exhausted retry budget", "rate-limit headers and remaining quota"],
+        "evidence": ["contract tests with recorded responses", "timeout and 429 regression tests", "idempotency test for repeated writes", "small reviewable Git commit with CI evidence"],
+        "interview": "Design a client that handles 201, 204, 401, 403, 404, 409, 422, 429 and 503 differently and justify every retry decision.",
+    },
+    "testing": {
+        "career": "Production AI changes frequently: prompts, retrieval, models and providers evolve independently. A layered test and evaluation strategy is the safety net that permits fast changes without guessing.",
+        "architecture": "Put deterministic domain rules behind pure interfaces, providers behind adapters and probabilistic behavior behind versioned evaluation suites. Each layer receives the cheapest test that can disprove its contract.",
+        "signals": ["test duration and flake rate", "offline eval pass rate by slice", "escaped defects by component", "change failure rate after releases"],
+        "evidence": ["unit tests for domain rules", "integration tests at provider boundaries", "golden/eval dataset for model behavior", "end-to-end smoke test for the critical path"],
+        "interview": "Given an untestable function that mixes UI, HTTP and model calls, separate responsibilities and choose which dependencies to fake versus integrate.",
+    },
+    "ml_basics": {
+        "career": "A model is useful only when it generalizes at the real decision point. AI Engineers must protect the split, reproduce training and explain why offline performance is credible.",
+        "architecture": "Version feature extraction, split logic, training configuration and model artifacts separately. The inference path must recreate training transformations without accessing future labels.",
+        "signals": ["train/validation gap", "learning curves by data volume", "performance by time and entity slice", "feature-distribution shift"],
+        "evidence": ["immutable split manifest", "baseline comparison", "reproducible seed and environment", "single untouched test evaluation"],
+        "interview": "Diagnose a 99% train score and 71% validation score, then prioritize data, regularization and model-complexity experiments.",
+    },
+    "metrics": {
+        "career": "Metric choice converts business harm into an engineering target. The wrong aggregate metric can make a harmful model look excellent.",
+        "architecture": "Log scores and outcomes so thresholds can be evaluated offline. Keep metric definitions versioned and calculate them by risk-relevant segment, not only globally.",
+        "signals": ["precision and recall at the deployed threshold", "PR-AUC under class imbalance", "calibration error", "cost-weighted errors by segment"],
+        "evidence": ["confusion matrix with counts", "threshold curve", "bootstrap confidence interval", "error-analysis sample with labeled root causes"],
+        "interview": "Select a metric for a rare high-cost event and calculate precision, recall and F1 from a concrete confusion matrix.",
+    },
+    "data_quality": {
+        "career": "Most model incidents begin as data incidents. Schema validity is only the first layer; semantic correctness, point-in-time availability and population coverage decide whether training evidence survives production.",
+        "architecture": "Validate data at ingestion, after transformation and before model consumption. Persist rejected rows, rule versions and lineage so a bad metric can be traced to its source.",
+        "signals": ["missingness and invalid values by field", "duplicate and late-arriving record rate", "feature drift by slice", "point-in-time leakage audit failures"],
+        "evidence": ["typed data contract", "quality-rule suite", "train-serving skew report", "reconciliation from source to feature table"],
+        "interview": "Explain why a cancellation date creates leakage and redesign the dataset with a precise prediction timestamp.",
+    },
+    "nn": {
+        "career": "You rarely derive every gradient by hand at work, but you must recognize unstable training, choose a sensible optimization setup and connect curves to corrective experiments.",
+        "architecture": "Treat data loader, model definition, loss, optimizer, checkpointing and evaluation as versioned components. A run should be reproducible from configuration plus artifact hashes.",
+        "signals": ["train and validation loss curves", "gradient and activation norms", "learning-rate schedule", "throughput and accelerator utilization"],
+        "evidence": ["overfit-one-batch sanity test", "baseline architecture", "ablation for a regularizer", "checkpoint evaluated on an untouched split"],
+        "interview": "Trace the dimensions through a small network and diagnose a loss that becomes NaN after several batches.",
+    },
+    "embeddings": {
+        "career": "Embeddings power search, recommendations, clustering and retrieval, but their usefulness depends on task-specific relevance, indexing choices and drift monitoring rather than attractive vector plots.",
+        "architecture": "Version the embedding model, preprocessing and vector dimension together. Store stable document IDs and metadata so vectors can be reindexed, filtered and traced back to source text.",
+        "signals": ["Recall@k and MRR on judged queries", "zero-vector and norm distribution", "index freshness and orphan vectors", "latency by candidate count"],
+        "evidence": ["labeled query-document pairs", "lexical baseline comparison", "nearest-neighbor error analysis", "reindex reproducibility test"],
+        "interview": "Explain cosine similarity, its limits and how you would prove that a new embedding model improves retrieval.",
+    },
+    "transformers": {
+        "career": "Understanding attention, token representations and autoregressive decoding makes model behavior, latency and context limitations easier to reason about even when using hosted APIs.",
+        "architecture": "Separate tokenization, model execution, decoding policy and application constraints. Shapes, masks, positional information and cache behavior are explicit contracts.",
+        "signals": ["tokens processed per second", "time to first token", "attention-mask and sequence-length distribution", "memory use of the key-value cache"],
+        "evidence": ["shape assertions", "causal-mask unit example", "decoding comparison", "latency measurement by context length"],
+        "interview": "Calculate the attention tensor shapes for a small batch and explain why causal masking is required for next-token generation.",
+    },
+    "prompting": {
+        "career": "Prompts are versioned application behavior, not magic prose. Strong prompt engineering starts with a task contract, representative evaluations and controlled context.",
+        "architecture": "Keep instructions, trusted context, user data and output schema distinct. Render prompts deterministically and log their version rather than copying strings across UI code.",
+        "signals": ["task-success rate by prompt version", "format-validation failures", "refusal and hallucination slices", "input/output tokens and latency"],
+        "evidence": ["prompt regression set", "before/after error taxonomy", "schema conformance rate", "human review on ambiguous cases"],
+        "interview": "Turn a vague summarization request into a measurable contract and show how you would test it across different document types.",
+    },
+    "structured": {
+        "career": "Machine-consumed model output must be parsed, validated and authorized. Structured output and tool calling turn probabilistic text into bounded application actions.",
+        "architecture": "Validate model output against a typed schema, map validation errors to controlled retries and authorize tool execution separately from the model's proposal.",
+        "signals": ["schema-valid response rate", "repair-attempt count", "tool error rate by operation", "denied or human-approved actions"],
+        "evidence": ["schema edge-case tests", "malformed-output fixtures", "tool permission tests", "idempotent execution test"],
+        "interview": "Design a ticket-routing schema and explain what happens when the model emits an unknown category or a destructive tool call.",
+    },
+    "tokens": {
+        "career": "Context and output length directly affect latency, cost and sometimes quality. AI Engineers need budgets and measurements instead of treating the context window as free storage.",
+        "architecture": "Estimate tokens before provider calls, reserve output capacity, prioritize context and record usage at the feature and tenant level.",
+        "signals": ["input and output tokens per request", "time to first token and total latency", "cache hit rate", "cost per successful task"],
+        "evidence": ["token-budget tests", "quality-versus-context experiment", "cache correctness check", "cost forecast matched to observed usage"],
+        "interview": "Reduce the cost of a long-context assistant without breaking answer quality and state the experiment that proves the trade-off.",
+    },
+    "rag_pipeline": {
+        "career": "RAG is a data system plus a retrieval system plus a generation system. Each stage must be observable and independently testable to avoid blaming the language model for ingestion defects.",
+        "architecture": "Use stable source and chunk IDs through parsing, chunking, embedding and indexing. Preserve lineage from every cited passage back to document version and source URL.",
+        "signals": ["documents accepted/rejected per run", "index freshness and coverage", "retrieval hit rate", "grounded answer rate with citations"],
+        "evidence": ["ingestion reconciliation", "retrieval eval set", "citation support audit", "fallback behavior when retrieval is empty"],
+        "interview": "Draw the offline ingestion and online query paths and identify how each component can fail independently.",
+    },
+    "chunking": {
+        "career": "Chunking determines what the retriever can find. Choosing size and overlap without evaluation creates silent recall loss or expensive irrelevant context.",
+        "architecture": "Store chunk boundaries, hierarchy, section metadata and parent document IDs. Make the chunking strategy versioned so an index can be rebuilt and compared.",
+        "signals": ["Recall@k by question type", "relevant-token density", "duplicate retrieval caused by overlap", "reranker lift and latency"],
+        "evidence": ["chunk-size experiment", "dense versus lexical baseline", "metadata-filter test", "hard-negative analysis"],
+        "interview": "Choose a chunking strategy for policy manuals and explain how tables, headings and cross-section questions change the design.",
+    },
+    "rag_eval": {
+        "career": "A fluent answer can still be unsupported. RAG evaluation separates source availability, retrieval success, generation correctness and citation support so teams repair the right stage.",
+        "architecture": "Persist query, expected evidence, retrieved IDs, answer and cited spans for each eval case. Report retrieval and generation metrics separately and by slice.",
+        "signals": ["Hit@k, Recall@k and MRR", "answer correctness and completeness", "faithfulness and citation precision", "abstention quality when evidence is missing"],
+        "evidence": ["human-labeled evidence set", "answer rubric with anchors", "unsupported-claim audit", "regression thresholds by risk slice"],
+        "interview": "Given poor answer accuracy, determine whether retrieval or generation is responsible using stage-specific evidence.",
+    },
+    "workflow": {
+        "career": "Deterministic workflows are easier to test, secure and operate. Agentic choice should be introduced only where variable planning creates measurable value.",
+        "architecture": "Represent known steps and transitions explicitly. Give every state entry criteria, output schema, retry policy and terminal failure path.",
+        "signals": ["success and failure rate by state", "transition count per task", "loop and timeout frequency", "human escalation rate"],
+        "evidence": ["state-transition tests", "replayable execution trace", "bounded-loop test", "comparison against a deterministic baseline"],
+        "interview": "Convert a vague agent into a state machine and identify the one decision that genuinely requires model judgment.",
+    },
+    "tools": {
+        "career": "Tool-using AI can affect external systems. State, permissions, validation and replay protection are more important than how convincingly the model describes its plan.",
+        "architecture": "The model proposes typed tool arguments; policy code validates and authorizes them; an executor performs the action and returns a structured observation.",
+        "signals": ["tool-call success and denial rate", "invalid argument frequency", "duplicate execution prevented", "budget consumption per task"],
+        "evidence": ["tool-schema contract tests", "least-privilege permission matrix", "idempotency-key test", "trace showing proposal, approval and result"],
+        "interview": "Design a safe email tool and distinguish drafting, previewing and actually sending in the authorization model.",
+    },
+    "hitl": {
+        "career": "Human approval is a risk control, not a universal pause button. Good systems request review where consequence and uncertainty justify the interruption.",
+        "architecture": "Persist the proposed action, evidence, risk level, reviewer decision and expiry. Execution consumes a specific approval exactly once.",
+        "signals": ["approval and rejection rate", "review latency", "overridden model decisions", "actions blocked after approval expiry"],
+        "evidence": ["risk-tier policy tests", "expired-approval test", "reviewer usability study", "audit trail from proposal to execution"],
+        "interview": "Define approval boundaries for a support copilot that can search, draft replies, grant refunds and close accounts.",
+    },
+    "eval_design": {
+        "career": "Without representative evaluations, teams optimize anecdotes. Eval design turns product expectations into repeatable evidence and release gates.",
+        "architecture": "Version cases, inputs, expected behavior, rubrics, graders and thresholds. Keep protected holdouts and report results by difficulty and risk slice.",
+        "signals": ["task success by slice", "confidence interval and sample size", "grader disagreement", "coverage of known production failures"],
+        "evidence": ["data-sheet for the eval set", "human labeling guide", "baseline and target thresholds", "failure taxonomy linked to regression cases"],
+        "interview": "Build an eval plan for a support assistant, including sampling, rubrics, human labels and go/no-go thresholds.",
+    },
+    "judge": {
+        "career": "LLM judges scale qualitative review but introduce their own model, prompt and position biases. They must be calibrated like any other measurement instrument.",
+        "architecture": "Separate generation from judging, randomize presentation where possible and store judge rationale, version and raw scores alongside human references.",
+        "signals": ["agreement with human labels", "false-pass and false-fail rate", "score stability across reruns", "bias by answer order or length"],
+        "evidence": ["calibration set", "inter-rater agreement", "blind pairwise test", "manual review of judge disagreements"],
+        "interview": "Explain when an LLM judge is appropriate and design a calibration experiment that can reveal position bias.",
+    },
+    "regression": {
+        "career": "Prompt, model and index changes can improve averages while breaking critical cases. Regression engineering connects offline evidence, controlled rollout and production telemetry.",
+        "architecture": "Every release carries version metadata through traces. CI runs deterministic tests and bounded evals; deployment supports canary comparison and rollback.",
+        "signals": ["eval delta against the current production version", "canary error and task-success rate", "rollback frequency", "production failure cases added to the suite"],
+        "evidence": ["versioned baseline report", "release gate configuration", "shadow/canary comparison", "tested rollback procedure"],
+        "interview": "Plan the rollout of a new model that is cheaper but behaves differently on long German inputs.",
+    },
+    "injection": {
+        "career": "Retrieved pages, uploaded files and tool outputs are untrusted input. Prompt injection becomes dangerous when model text is allowed to influence data access or external actions.",
+        "architecture": "Enforce trust boundaries outside the model. Limit retrieved content, tool permissions and output channels; never let untrusted text redefine policy.",
+        "signals": ["blocked injection patterns", "sensitive-output detections", "unexpected tool requests", "attack success rate in the security eval set"],
+        "evidence": ["threat model", "adversarial test corpus", "authorization tests independent of prompts", "exfiltration regression test"],
+        "interview": "Threat-model a RAG assistant that can read internal files and show why instruction hierarchy alone is insufficient.",
+    },
+    "privacy": {
+        "career": "AI pipelines replicate data across prompts, logs, indexes and provider systems. Data minimization and retention controls must cover the complete lifecycle.",
+        "architecture": "Classify data before use, redact at boundaries, encrypt storage and transport, and attach retention plus deletion behavior to every persisted artifact.",
+        "signals": ["PII detections and redactions", "records beyond retention", "access denials", "deletion completion across derived stores"],
+        "evidence": ["data-flow inventory", "retention policy test", "provider configuration review", "end-to-end deletion audit"],
+        "interview": "Trace one customer message through an AI support system and identify every place where personal data may persist.",
+    },
+    "redteam": {
+        "career": "Red teaming discovers how a system fails under intentional misuse and unusual combinations. Findings are valuable only when reproducible, prioritized and converted into regression coverage.",
+        "architecture": "Maintain an attack library mapped to assets and controls. Run safe automated probes continuously and reserve human exploration for novel behavior.",
+        "signals": ["attack success rate by category", "severity-weighted open findings", "guardrail false-positive rate", "time from finding to regression test"],
+        "evidence": ["reproduction steps", "impact and likelihood rating", "control-level remediation", "passing regression after the fix"],
+        "interview": "Create a red-team plan for a tool-using assistant and balance attack coverage against legitimate-user blocking.",
+    },
+    "deployment": {
+        "career": "A notebook becomes a product only when it has a stable service contract, repeatable build, health checks, configuration, safe rollout and an owner when things fail.",
+        "architecture": "Package a stateless application service, inject configuration at runtime and isolate external model and data providers behind time-bounded adapters.",
+        "signals": ["availability and request latency", "startup/readiness failures", "resource saturation", "release and rollback status"],
+        "evidence": ["container build", "API contract test", "liveness and readiness checks", "deployment plus rollback runbook"],
+        "interview": "Turn a local inference script into an API and explain container, configuration, health-check and scaling decisions.",
+    },
+    "observability": {
+        "career": "AI incidents cross retrieval, providers, tools and application code. Correlated traces, metrics and privacy-aware logs make the failure path observable.",
+        "architecture": "Propagate one request ID through every boundary. Use traces for causality, metrics for aggregates and logs for structured detail without secret or PII leakage.",
+        "signals": ["end-to-end and component latency", "error rate by provider/model version", "token and tool usage", "quality proxy and user correction rate"],
+        "evidence": ["trace for one complete request", "SLO dashboard", "redaction test", "alert linked to a diagnostic runbook"],
+        "interview": "Given only a nine-second total latency, propose instrumentation that can prove whether retrieval, model or tool execution is responsible.",
+    },
+    "resilience": {
+        "career": "External AI providers fail, slow down and enforce quotas. Resilience combines time budgets, bounded retries, circuit breaking, fallbacks and cost controls without hiding degraded quality.",
+        "architecture": "Propagate a request deadline, centralize retry responsibility and make degraded modes explicit in the response and telemetry.",
+        "signals": ["timeout and retry-exhaustion rate", "circuit state", "fallback usage and quality", "cost per request during incidents"],
+        "evidence": ["fault-injection test", "retry-amplification test", "cache correctness test", "documented degradation and recovery runbook"],
+        "interview": "Prevent three nested services from multiplying retries and design a safe response when the model provider is unavailable.",
+    },
+    "system_design": {
+        "career": "System design connects product requirements to data, models, interfaces, reliability, security and cost. Good answers make assumptions and trade-offs measurable.",
+        "architecture": "Separate offline data/control paths from the online request path. Define ownership and contracts before choosing technologies.",
+        "signals": ["task success and quality SLO", "traffic and latency percentiles", "freshness and consistency", "unit cost and capacity headroom"],
+        "evidence": ["requirements table", "architecture and sequence diagram", "capacity estimate", "failure-mode and rollout plan"],
+        "interview": "Design a citation-first enterprise assistant from requirements through APIs, ingestion, evaluation, security and degraded operation.",
+    },
+    "portfolio": {
+        "career": "A portfolio is evidence of engineering judgment. Recruiters need to see a real problem, reproducible behavior, trade-offs, evaluation, deployment and lessons from failure.",
+        "architecture": "Organize the repository so a reviewer can move from problem and architecture to source, tests, evaluation artifacts and a working product without guessing.",
+        "signals": ["reproducible test/eval results", "live-demo health", "data freshness", "documented limitations and known failures"],
+        "evidence": ["clear README", "architecture decision record", "automated tests and eval report", "live demo with deterministic fallback"],
+        "interview": "Present one project in five minutes: problem, architecture, hardest trade-off, measured result, failure and next improvement.",
+    },
+    "interview": {
+        "career": "AI Engineering interviews test structured reasoning more than memorized tool names. Strong candidates clarify constraints, form hypotheses, quantify trade-offs and verify claims.",
+        "architecture": "Structure answers consistently: clarify, define contract, propose baseline, deepen architecture, discuss failures, select metrics and summarize the decision.",
+        "signals": ["time to a clear problem statement", "assumptions made explicit", "coverage of failure modes", "verification and trade-off quality"],
+        "evidence": ["timed coding practice", "recorded system-design answer", "debugging hypothesis log", "STAR stories with measurable outcomes"],
+        "interview": "Debug a failing API integration aloud, then design the larger production system and defend one deliberate trade-off.",
+    },
+}
+
+
 HTTP_STATUS_GROUPS = [
     ("1xx – Information", "Zwischenstatus; der Request ist noch nicht abschließend verarbeitet.", [(100, "Continue", "Client darf nach akzeptierten Headern den großen Body senden."), (101, "Switching Protocols", "Server wechselt etwa bei einem WebSocket-Handshake das Protokoll.")]),
     ("2xx – Erfolg", "Die Anfrage wurde angenommen oder erfolgreich verarbeitet.", [(200, "OK", "Erfolgreicher GET oder ein Request mit Response-Body."), (201, "Created", "POST hat eine neue Ressource erzeugt; häufig mit `Location`."), (202, "Accepted", "Job wurde angenommen, läuft aber asynchron weiter."), (204, "No Content", "Erfolg ohne Body, typisch nach DELETE oder Update.")]),
@@ -302,35 +521,500 @@ HTTP_STATUS_GROUPS = [
 ]
 
 
+def _chapter(
+    chapter_id: str,
+    title: str,
+    summary: str,
+    body: str,
+    minutes: int,
+    check: tuple[str, list[str], int, str],
+    practice: str,
+    takeaways: list[str],
+) -> dict[str, Any]:
+    question, options, answer, why = check
+    return {
+        "id": chapter_id,
+        "title": title,
+        "summary": summary,
+        "body": body,
+        "minutes": minutes,
+        "check": {"q": question, "options": options, "answer": answer, "why": why},
+        "practice": practice,
+        "takeaways": takeaways,
+    }
+
+
+def _deep_term_markdown(terms: list[tuple[str, str]]) -> str:
+    blocks = []
+    for index, (name, definition) in enumerate(terms, start=1):
+        blocks.append(
+            f"### {index}. {name}\n\n"
+            f"**Arbeitsdefinition.** {definition}\n\n"
+            "**Warum das im Beruf wichtig ist.** Der Begriff steuert eine konkrete Design-, "
+            "Implementierungs- oder Diagnoseentscheidung. Formuliere deshalb immer, woran du ihn "
+            "im System erkennst und welche Konsequenz er hat.\n\n"
+            "**Abgrenzung.** Verwechsle die Bezeichnung nicht mit einem Werkzeug oder einer bloßen "
+            "Implementierungsform. Ein Tool kann den Mechanismus unterstützen; die fachliche "
+            "Bedeutung und der beobachtbare Vertrag bleiben trotzdem deine Verantwortung.\n\n"
+            f"**Aktiver Abruf.** Erkläre `{name}` in eigenen Worten, nenne ein korrektes Beispiel "
+            "und konstruiere ein Gegenbeispiel, bei dem der Begriff häufig falsch verwendet wird."
+        )
+    return "\n\n---\n\n".join(blocks)
+
+
+def _workflow_markdown(steps: list[str]) -> str:
+    blocks = []
+    for index, step in enumerate(steps, start=1):
+        blocks.append(
+            f"### Schritt {index}: {step}\n\n"
+            "- **Ziel:** Welche Unsicherheit reduziert dieser Schritt?\n"
+            "- **Eingang:** Welche Daten, Konfiguration und Vorbedingungen müssen vorliegen?\n"
+            "- **Arbeit:** Welche Transformation oder Entscheidung gehört genau hierher?\n"
+            "- **Nachweis:** Welcher Test, welche Metrik oder welches Artefakt beweist das Ergebnis?\n"
+            "- **Abbruchbedingung:** Wann darf der nächste Schritt nicht starten?\n\n"
+            "Der Schritt ist erst abgeschlossen, wenn neben dem Happy Path auch sein Fehlerpfad "
+            "kontrolliert und beobachtbar ist."
+        )
+    return "\n\n".join(blocks)
+
+
+def _case_markdown(cases: list[str]) -> str:
+    blocks = []
+    for index, case in enumerate(cases, start=1):
+        blocks.append(
+            f"### Praxisfall {index}: {case}\n\n"
+            "1. **Ausgangslage:** Wer benötigt welches Ergebnis?\n"
+            "2. **Vertrag:** Welche Eingabe liegt am realen Entscheidungspunkt vor?\n"
+            "3. **Messung:** Welche Metrik unterscheidet Produkt und Demo?\n"
+            "4. **Risiko:** Welche falsche Entscheidung verursacht den größten Schaden?\n"
+            "5. **Betrieb:** Welche Telemetrie müsste in einem Incident verfügbar sein?\n\n"
+            "Beginne mit einer einfachen Baseline. Komplexität ist nur gerechtfertigt, wenn eine "
+            "Messung zeigt, dass die Baseline eine relevante Anforderung verfehlt."
+        )
+    return "\n\n---\n\n".join(blocks)
+
+
+def _failure_markdown(failures: list[str]) -> str:
+    blocks = []
+    for index, failure in enumerate(failures, start=1):
+        blocks.append(
+            f"### Fehlerbild {index}: {failure}\n\n"
+            "- **Symptom:** Was sehen Nutzer, Test oder Monitoring konkret?\n"
+            "- **Ursache:** An welcher Grenze laufen Erwartung und Verhalten auseinander?\n"
+            "- **Trenn-Test:** Welcher kleinste Test bestätigt oder widerlegt genau eine Hypothese?\n"
+            "- **Korrektur:** Wie wird die verursachende Grenze statt nur das Symptom repariert?\n"
+            "- **Regression:** Wie bleibt der reproduzierende Fall dauerhaft testbar?\n\n"
+            "Ein Retry, ein größerer Prompt oder eine neue Bibliothek ist keine Diagnose. Erst ein "
+            "reproduzierbarer Test und sein Ergebnis nach der Korrektur liefern Evidenz."
+        )
+    return "\n\n".join(blocks)
+
+
 def _generic_sections(lesson: dict[str, Any], bp: dict[str, Any]) -> list[dict[str, Any]]:
-    terms = "\n".join(f"- **{name}:** {definition}" for name, definition in bp["terms"])
-    workflow = "\n".join(f"{i}. {step}" for i, step in enumerate(bp["workflow"], 1))
-    cases = "\n".join(f"- **Praxisfall {i}:** {case}" for i, case in enumerate(bp["cases"], 1))
-    failures = "\n".join(f"- {failure}" for failure in bp["failures"])
+    ext = LESSON_EXTENSIONS[lesson["id"]]
+    first_term, first_definition = bp["terms"][0]
+    first_case = bp["cases"][0]
+    first_failure = bp["failures"][0]
+    signals = "\n".join(f"- **Signal {i}:** {item}" for i, item in enumerate(ext["signals"], 1))
+    evidence = "\n".join(f"- **Nachweis {i}:** {item}" for i, item in enumerate(ext["evidence"], 1))
+
     return [
-        {"id": "mental-model", "title": "1 · Mentales Modell", "body": f"{lesson['theory']}\n\nDiese Lektion behandelt das Thema als Teil eines Produktionssystems: Wir fragen nicht nur, *was* ein Begriff bedeutet, sondern welche Eingaben er erhält, welches beobachtbare Ergebnis erwartet wird und an welcher Systemgrenze Fehler auftreten können."},
-        {"id": "vocabulary", "title": "2 · Begriffe präzise unterscheiden", "body": terms},
-        {"id": "workflow", "title": "3 · Vom Entwurf zum belastbaren Ablauf", "body": f"Ein sinnvoller Arbeitsablauf ist:\n\n{workflow}\n\nDie Reihenfolge ist wichtig: Wer zuerst implementiert und erst danach Vertrag, Messung oder Failure Modes festlegt, erhält meist eine Demo, aber kein zuverlässig betreibbares System."},
-        {"id": "cases", "title": "4 · Typische Praxisfälle", "body": f"{cases}\n\nÜbertrage jeden Fall auf vier Fragen: Welche Daten sind verfügbar? Welche Entscheidung wird getroffen? Wie sieht ein Erfolg messbar aus? Was passiert bei Unsicherheit oder Ausfall?"},
-        {"id": "failure-modes", "title": "5 · Typische Fehlerbilder und Diagnose", "body": f"{failures}\n\nDiagnostiziere nicht durch Raten. Vergleiche erwartetes und beobachtetes Verhalten, isoliere die betroffene Grenze, formuliere eine Hypothese und wähle einen Test, der sie widerlegen kann."},
-        {"id": "worked-example", "title": "6 · Durchgearbeitetes Beispiel", "body": f"Das vorhandene Minimalbeispiel zeigt die Grundform:\n\n{lesson['example']}\n\nLies es wie ein Engineer: Markiere Eingaben, Ausgabe, implizite Annahmen, externe Abhängigkeiten und mindestens einen fehlenden Fehlerpfad. Im Build-Teil verbesserst du genau diese Lücken."},
+        _chapter(
+            "orientation", "1 · Orientierung: Warum dieses Thema zum Beruf gehört",
+            "Rolle, Lernziele, Systemgrenzen und berufliche Handlungsfähigkeit.",
+            f"""## Vom Begriff zur beruflichen Fähigkeit
+
+{lesson['theory']}
+
+{ext['career']}
+
+Eine berufsvorbereitende Lektion endet deshalb nicht bei *„Ich kenne die Definition“*. Du sollst einen realistischen Fall strukturieren, eine Baseline bauen oder bewerten, Fehler systematisch diagnostizieren und Qualität mit überprüfbaren Nachweisen belegen können.
+
+## Die fünf Ebenen dieser Lektion
+
+1. **Begriffe:** zentrale Konzepte präzise erklären und abgrenzen.
+2. **Mechanik:** Eingaben, Zustände und Transformationen verstehen.
+3. **Anwendung:** den Mechanismus in realistischen Produkt- und Datenfällen einsetzen.
+4. **Betrieb:** Fehler, Security, Kosten, Latenz und Observability berücksichtigen.
+5. **Nachweis:** mit Tests, Evals, Metriken und Artefakten zeigen, dass die Lösung funktioniert.
+
+## Systemgrenze
+
+Frage während der gesamten Lektion: Was kontrolliert deine Anwendung? Welche Abhängigkeit liegt außerhalb deiner Kontrolle? Welcher Vertrag verbindet beide Seiten? Welches Signal zeigt zuerst, dass dieser Vertrag verletzt wurde?
+
+## Lernstrategie
+
+Lies nicht passiv bis zum Ende. Formuliere nach jedem Kapitel die Kernidee ohne Vorlage, bearbeite den Wissenscheck und notiere mindestens eine offene Frage. Markiere in Beispielen Eingabe, Ausgabe, Annahmen, Seiteneffekte und fehlende Fehlerpfade. Genau diese Denkweise wird in Code Reviews und Interviews erwartet.""",
+            8,
+            ("Wann ist das Thema beruflich beherrscht?", ["Wenn du es anwenden, diagnostizieren und mit Evidenz belegen kannst", "Wenn du die Überschrift erkennst", "Wenn ein Tutorial einmal lief", "Wenn du viele Tools aufzählst"], 0, "Berufliche Handlungsfähigkeit verbindet Verständnis, Anwendung, Betrieb und Nachweis."),
+            f"Beschreibe für „{first_case}“ Nutzer, Eingabe, Ausgabe und messbares Erfolgskriterium.",
+            ["Definitionen sind der Anfang", "Jedes Thema besitzt Systemgrenzen", "Behauptungen benötigen Evidenz"],
+        ),
+        _chapter(
+            "mental-model", "2 · Mentales Modell und fachlicher Vertrag",
+            "Das Thema als Input–Transformation–Output-System verstehen.",
+            f"""## Das minimale mentale Modell
+
+Ein Engineering-System lässt sich als Vertrag lesen: **Eingaben → kontrollierte Verarbeitung → beobachtbare Ausgabe**. Dazu kommen Zustand, externe Abhängigkeiten und Fehlerpfade. Für **{lesson['title']}** musst du sagen können, welche Annahme vor der Verarbeitung gilt, welche Invariante erhalten bleibt und wie ein Downstream einen Fehler erkennt.
+
+## Input
+
+Inputs sind nicht nur Funktionsparameter. Dazu gehören Datenformat, Zeitpunkt, Identität, Berechtigung, Konfiguration, Modell- oder Promptversion und externe Verfügbarkeit. Ein professioneller Vertrag benennt Pflichtfelder, erlaubte Werte, Größenlimits und Verhalten bei fehlender Information.
+
+## Verarbeitung
+
+{ext['architecture']} Jeder Schritt erhält einen klaren Zweck und einen prüfbaren Zwischenzustand. So kann ein Fehler lokalisiert werden, statt das Gesamtsystem durch Vermutungen zu verändern.
+
+## Output
+
+Ein Output ist erst brauchbar, wenn sein Empfänger Typ oder Schema, Qualitätsaussage, Fehlerzustand und gegebenenfalls Provenienz kennt. Bei probabilistischen Komponenten muss zusätzlich sichtbar sein, wo Unsicherheit besteht und wann Ablehnung besser ist als eine selbstsichere Antwort.
+
+## Vertrag in einem Satz
+
+*Wenn gültige Eingaben unter den genannten Vorbedingungen eintreffen, erzeugt die Komponente innerhalb ihres Budgets eine Ausgabe mit diesen Eigenschaften; andernfalls liefert sie einen expliziten Fehler- oder Degradationszustand.* Dieser Satz trägt Implementierung, Review und Test.""",
+            10,
+            ("Welche Beschreibung ist belastbar?", ["Eingaben, Vorbedingungen, Ausgabe, Budget und Fehlerverhalten sind explizit", "Die Komponente ist modern", "Das Framework ist bekannt", "Nur der Happy Path wurde gezeigt"], 0, "Ein Vertrag beschreibt beobachtbares Verhalten einschließlich Grenzen."),
+            "Zeichne Input, Validierung, Kernverarbeitung, Output und Telemetrie. Notiere an jeder Verbindung einen Vertrag.",
+            ["Input umfasst Kontext und Versionen", "Zwischenschritte lokalisieren Ursachen", "Fehlerzustände gehören zur Schnittstelle"],
+        ),
+        _chapter(
+            "vocabulary", "3 · Kernbegriffe verstehen und abgrenzen",
+            "Arbeitsdefinitionen, Bedeutung, Gegenbeispiele und aktiver Abruf.",
+            _deep_term_markdown(bp["terms"]), 14,
+            (f"Was ist die beste Lernprobe für `{first_term}`?", ["Definition, Beispiel, Gegenbeispiel und technische Konsequenz erklären", "Nur die Schreibweise lernen", "Ein Tool nennen", "Die Definition kopieren"], 0, f"{first_term} ist verstanden, wenn du {first_definition.lower()} und daraus eine Entscheidung ableitest."),
+            f"Vergleiche {', '.join(name for name, _ in bp['terms'])} nach Definition, Einsatz, Verwechslung und Signal.",
+            ["Begriffe müssen Entscheidungen ermöglichen", "Gegenbeispiele decken Scheinsicherheit auf", "Tools ersetzen keine Erklärung"],
+        ),
+        _chapter(
+            "workflow", "4 · Der professionelle Ablauf – Schritt für Schritt",
+            "Vom Problem bis zum Ergebnis mit reproduzierbaren Übergaben und Gates.",
+            f"""## Warum Reihenfolge zählt
+
+Wer sofort implementiert, optimiert häufig einen unklaren Vertrag. Ein professioneller Ablauf reduziert Unsicherheit schrittweise und erzeugt nach jedem Schritt ein überprüfbares Artefakt.
+
+{_workflow_markdown(bp['workflow'])}
+
+## Übergaben statt Gedächtnis
+
+Verwende Schemas, Konfiguration, Testfälle, Metrikdefinitionen und versionierte Artefakte. So kann eine zweite Person den Stand reproduzieren und eine Änderung beurteilen.
+
+## Kleine vertikale Scheibe
+
+Baue früh einen dünnen End-to-End-Pfad mit realistischen Grenzen. Er darf fachlich einfach sein, muss aber Datenfluss, Fehlerbehandlung und Messung enthalten. Danach vertiefst du die riskantesten Komponenten anhand von Evidenz.""",
+            16,
+            ("Warum besitzt jeder Schritt ein Gate?", ["Damit ein schlechter Zwischenstand nicht weitere Stufen verfälscht", "Damit Tests erst am Ende nötig sind", "Damit Fehler verborgen bleiben", "Nur für mehr Dokumente"], 0, "Gates stoppen Fehler dort, wo ihre Ursache lokalisierbar ist."),
+            f"Wende den Ablauf auf „{first_case}“ an und notiere je Schritt Artefakt, Kriterium und Stop-Grund.",
+            ["Jeder Schritt reduziert Unsicherheit", "Artefakte machen Übergaben reproduzierbar", "Ein dünner End-to-End-Pfad deckt Risiken früh auf"],
+        ),
+        _chapter(
+            "worked-example", "5 · Implementierung lesen, erklären und verbessern",
+            "Ein Minimalbeispiel systematisch analysieren statt nur kopieren.",
+            f"""## Ausgangspunkt
+
+{lesson['example']}
+
+## Erste Lesung: Verhalten
+
+Beschreibe ohne Implementierungsdetails Eingabe, Ausgabe und Seiteneffekt. Suche danach implizite Annahmen: Typ, Wertebereich, Reihenfolge, Netzverfügbarkeit, Modellverhalten oder Konfiguration.
+
+## Zweite Lesung: Grenzen
+
+Markiere Netzwerk, Dateisystem, Uhrzeit, Zufall, globale Konfiguration und Provider. Diese Grenzen benötigen Timeouts, Fehlerübersetzung, Testdoubles oder Integrationsnachweise.
+
+## Dritte Lesung: Fehlerpfade
+
+Was passiert bei leerer, ungültiger, sehr großer oder verspäteter Eingabe? Was passiert bei partiellem Downstream-Ausfall? Ist der Vorgang sicher wiederholbar? Wird ein Fehler sichtbar oder still in einen scheinbar gültigen Wert verwandelt?
+
+## Von der Demo zur Komponente
+
+1. Ein- und Ausgabevertrag extrahieren.
+2. Früh an der Grenze validieren.
+3. Pure Logik von Seiteneffekten trennen.
+4. Ressourcen- und Zeitbudgets setzen.
+5. Telemetrie ohne Secrets ergänzen.
+6. Normalfall und gefährlichsten Fehlerfall testen.
+
+Die beste Verbesserung ist die kleinste Änderung, die eine konkrete Anforderung nachweisbar erfüllt.""",
+            14,
+            ("Was passiert vor einer großen Überarbeitung?", ["Vertrag, kritischste Annahme und reproduzierenden Test festlegen", "Mehr Bibliotheken installieren", "Fehler verstecken", "Alles gleichzeitig ändern"], 0, "Ein Test hält Ursache und Wirkung getrennt."),
+            "Kommentiere das Beispiel mit Vertrag, Annahmen und Fehlerpfaden. Formuliere eine Verbesserung und zwei Tests.",
+            ["Code wird über Verhalten gelesen", "Seiteneffekte erhalten Grenzen", "Kleine beweiskräftige Änderungen sind überlegen"],
+        ),
+        _chapter(
+            "cases", "6 · Realistische Praxisfälle und Produktentscheidungen",
+            "Das Wissen auf unterschiedliche Nutzer-, Daten- und Risikosituationen übertragen.",
+            f"""## Transfer statt Wiedererkennung
+
+In der Praxis sieht eine Aufgabe selten wie das Lernbeispiel aus. Übertrage denselben Mechanismus auf mehrere Situationen und prüfe, welche Annahmen stabil bleiben.
+
+{_case_markdown(bp['cases'])}
+
+## Baseline und Segmentierung
+
+Beginne mit der einfachsten vollständigen Lösung. Sie schafft einen messbaren Vergleich. Prüfe Ergebnisse außerdem nach Sprache, Datenqualität, Länge, Risiko, Quelle, Zeit und Nutzergruppe. Ein guter Durchschnitt kann einen kritischen Teil der Nutzer verdecken.""",
+            15,
+            ("Warum mehrere Praxisfälle?", ["Damit Transfer und Grenzen des mentalen Modells sichtbar werden", "Nur für mehr Text", "Damit keine Baseline nötig ist", "Damit alle Fälle dieselbe Lösung erzwingen"], 0, "Transfer auf neue Fälle zeigt echtes Verständnis."),
+            f"Vergleiche „{first_case}“ mit einem selbst konstruierten Grenzfall nach Vertrag, Risiko, Metrik und Fallback.",
+            ["Baseline macht Fortschritt messbar", "Segmente verhindern irreführende Durchschnitte", "Transfer deckt Annahmen auf"],
+        ),
+        _chapter(
+            "failure-modes", "7 · Fehlerbilder systematisch diagnostizieren",
+            "Symptom, Ursache, Test, Korrektur und Regression trennen.",
+            f"""## Debugging als Hypothesentest
+
+Beginne mit reproduzierbarer Eingabe, tatsächlicher Ausgabe, Versionen, Zeitstempel und Telemetrie. Erst danach entsteht eine Hypothese. Jede Änderung bestätigt oder widerlegt genau diese Hypothese.
+
+{_failure_markdown(bp['failures'])}
+
+## Diagnosefolge
+
+1. Problem reproduzieren und Scope begrenzen.
+2. Letzte funktionierende Version bestimmen.
+3. Input, Konfiguration und Versionen vergleichen.
+4. Grenze mit der stärksten Evidenz isolieren.
+5. Einen kleinen Test ausführen.
+6. Ursache beheben und denselben Test wiederholen.
+7. Regression sichern und ähnliche Pfade prüfen.
+
+Eine gute Fehlermeldung nennt Operation, betroffene Ressource, erwarteten Zustand und sichere nächste Aktion. Logs ergänzen Correlation-ID, Version und technische Ursache – ohne Secrets.""",
+            17,
+            (f"Was ist bei „{first_failure}“ zuerst sinnvoll?", ["Evidenz sammeln und eine isolierbare Hypothese formulieren", "Alles austauschen", "Unbegrenzt wiederholen", "Fehler ignorieren"], 0, "Debugging ist Hypothesentest, kein Raten."),
+            f"Erstelle für „{first_failure}“ Symptom, drei Hypothesen, Trenn-Test, Fix und Regressionstest.",
+            ["Symptom ist nicht Ursache", "Ein Test trennt eine Hypothese", "Jeder echte Fehler erweitert die Regression Suite"],
+        ),
+        _chapter(
+            "production", "8 · Produktion: Reliability, Security, Kosten und Observability",
+            "Den Mechanismus unter realer Last, Abhängigkeiten und Risiken betreiben.",
+            f"""## Architektur im Betrieb
+
+{ext['architecture']}
+
+## Reliability
+
+Definiere Zeit-, Größen- und Wiederholungsbudgets. Unterscheide permanente von temporären Fehlern. Degradation muss sichtbar sein und darf nicht still eine andere Qualität als Normalbetrieb verkaufen.
+
+## Security und Datenschutz
+
+Validiere untrusted Input, minimiere Berechtigungen und protokolliere keine Secrets. Kläre, welche Daten externe Abhängigkeiten erhalten, wie lange Artefakte gespeichert werden und wie Löschung propagiert.
+
+## Kosten und Kapazität
+
+Miss Stückkosten pro erfolgreichem Ergebnis. Retries, lange Kontexte, große Batches oder zusätzliche Modellaufrufe können Kosten vervielfachen.
+
+## Beobachtbare Signale
+
+{signals}
+
+Metriken erklären Aggregate, Traces den Pfad eines Vorgangs und strukturierte Logs Details. Gemeinsame Versionen und Correlation-IDs verbinden sie.""",
+            16,
+            ("Welche Telemetrie ist nützlich?", ["Signale für Vertrag, Qualität, Fehler und Ressourcen einer Version", "Nur die Zahl der Logzeilen", "Screenshots", "Nur Trainingsmetriken"], 0, "Gute Observability beantwortet konkrete Fragen zum Betrieb."),
+            "Definiere ein Mini-SLO, vier Metriken, einen Logeintrag und einen Trace mit drei Spans.",
+            ["Degradation ist explizit", "Security wird technisch erzwungen", "Kosten zählen pro erfolgreichem Ergebnis"],
+        ),
+        _chapter(
+            "verification", "9 · Tests, Evals und belastbare Nachweise",
+            "Passende Evidenz für deterministische und probabilistische Komponenten.",
+            f"""## Evidenzpyramide
+
+Statische Prüfungen finden Typ- und Konfigurationsprobleme. Unit Tests prüfen kleine deterministische Verträge. Integrationstests prüfen echte Grenzen. End-to-End-Tests schützen wenige kritische Nutzerpfade. Evals messen probabilistische Qualität über Datensatz und Rubrik.
+
+## Nachweise für diese Lektion
+
+{evidence}
+
+## Testdesign
+
+Jeder Test benötigt Ausgangszustand, Eingabe, erwartetes Verhalten und eine präzise Aussage. Randfälle umfassen leere, ungültige, maximale, doppelte, verspätete und nicht autorisierte Eingaben sowie externe Ausfälle.
+
+## Reproduzierbarkeit
+
+Speichere Codeversion, Fixture- oder Datenversion, Konfiguration, Seed und Provider-/Modellversion. Ein Ergebnis ohne Provenienz ist schwer vergleichbar.
+
+## Release Gate
+
+Lege Schwellenwerte vor der Auswertung fest. Deterministische Verträge müssen bestehen; kritische Sicherheitsregressionen sind Stopper; Qualität, Latenz und Kosten bleiben innerhalb definierter Grenzen. Kritische Segmente besitzen eigene Mindestwerte.""",
+            16,
+            ("Wann ist ein Nachweis reproduzierbar?", ["Wenn Versionen, Daten, Konfiguration, Eingabe und Erwartung bekannt sind", "Nur wenn das Ergebnis genannt wird", "Wenn er manchmal klappt", "Ohne Randfälle"], 0, "Vollständige Provenienz erlaubt unabhängiges Wiederholen und Vergleichen."),
+            "Schreibe zwei Unit Tests, einen Integrationstest, einen Failure-Test und gegebenenfalls drei Eval-Fälle samt Gate.",
+            ["Testart folgt Systemgrenze", "Probabilistische Qualität braucht Rubrik", "Gates werden vorher definiert"],
+        ),
+        _chapter(
+            "career-transfer", "10 · Berufs- und Interviewtransfer",
+            "Entscheidungen erklären, Artefakte zeigen und Trade-offs verteidigen.",
+            f"""## Vorzeigbares Ergebnis
+
+Nach dieser Lektion solltest du ein kleines prüfbares Artefakt besitzen: Vertrag, Code oder Architektur, Test- beziehungsweise Eval-Ergebnis, Telemetrieplan und eine begründete Trade-off-Entscheidung.
+
+## Interviewaufgabe
+
+{ext['interview']}
+
+Strukturiere die Antwort: Anforderungen klären, Annahmen nennen, Baseline wählen, Daten- und Kontrollfluss erklären, Fehler behandeln, Messung festlegen und Trade-off zusammenfassen.
+
+## Code-Review-Perspektive
+
+Ist das Verhalten klar? Werden ungültige Zustände früh abgewiesen? Ist der gefährlichste Fehler getestet? Sind Observability, Security und Kosten angemessen? Kann die Änderung sicher zurückgerollt werden?
+
+## Definition of Done
+
+- `{first_term}` ohne Vorlage erklären und abgrenzen.
+- Den Ablauf von `{bp['workflow'][0]}` bis `{bp['workflow'][-1]}` begründen.
+- Mindestens drei Praxisfälle strukturieren.
+- `{first_failure}` reproduzieren, diagnostizieren und absichern.
+- Produktionssignale und Nachweise benennen.
+- Eine bewusst nicht gewählte Alternative erklären.
+
+Notiere abschließend: Was war neu? Welche Annahme war falsch? Welchen Fehler erkennst du nun schneller? Welches Artefakt ergänzt dein Portfolio?""",
+            12,
+            ("Was ist der stärkste Interviewbeleg?", ["Artefakt mit Entscheidung, Messung, Fehlerfall und Trade-off", "Frameworkliste", "Selbsteinschätzung", "Tutorial ohne Tests"], 0, "Engineering-Reife wird durch Evidenz sichtbar."),
+            f"Beantworte schriftlich und in fünf Minuten mündlich: {ext['interview']}",
+            ["Artefakte sind stärker als Behauptungen", "Antworten folgen einem Denkrahmen", "Trade-offs erhöhen Glaubwürdigkeit"],
+        ),
     ]
 
 
 def _http_sections(lesson: dict[str, Any], bp: dict[str, Any]) -> list[dict[str, Any]]:
-    sections = _generic_sections(lesson, bp)[:3]
+    sections = _generic_sections(lesson, bp)
     status_md = []
     for heading, intro, statuses in HTTP_STATUS_GROUPS:
         rows = "\n".join(f"| `{code}` | **{name}** | {case} |" for code, name, case in statuses)
         status_md.append(f"### {heading}\n\n{intro}\n\n| Code | Bedeutung | Typischer Fall |\n|---:|---|---|\n{rows}")
-    sections.extend([
-        {"id": "status-codes", "title": "4 · HTTP-Statuscodes: vollständige Arbeitsreferenz", "body": "\n\n".join(status_md)},
-        {"id": "status-decisions", "title": "5 · Statuscode in Clientverhalten übersetzen", "body": "Ein Statuscode ist kein dekorativer Text, sondern steuert den nächsten Zustand des Clients. `2xx` wird gemäß Vertrag verarbeitet; `204` darf nicht als JSON geparst werden. `401` führt zur erneuten Authentifizierung, `403` nicht zu blindem Token-Refresh. `404` kann ein falscher Pfad oder eine fehlende Ressource sein. `409` verlangt oft State-Refresh oder Idempotenzprüfung. `422` erfordert Feldkorrektur. `429`, `502`, `503` und `504` können temporär sein, dürfen aber nur begrenzt, mit Backoff/Jitter und innerhalb eines Zeitbudgets wiederholt werden. `400`, `403`, `404`, `405`, `415` und `422` werden durch identische Wiederholung normalerweise nicht besser."},
-        {"id": "robust-client", "title": "6 · Robuster Python-Client", "body": "```python\nimport time\nimport requests\n\ndef get_json(url: str, attempts: int = 3) -> dict:\n    for attempt in range(attempts):\n        response = requests.get(url, timeout=(3.05, 10))\n        if response.status_code == 204:\n            return {}\n        if response.status_code == 429 or response.status_code >= 500:\n            if attempt + 1 == attempts:\n                response.raise_for_status()\n            wait = int(response.headers.get('Retry-After', 2 ** attempt))\n            time.sleep(min(wait, 30))\n            continue\n        response.raise_for_status()\n        return response.json()\n    raise RuntimeError('unreachable')\n```\n\nDer Client trennt Connect- und Read-Timeout, parst keinen leeren Body, wiederholt nur plausible temporäre Fehler begrenzt und wirft permanente Fehler sofort. In Produktion kommen Jitter, strukturiertes Logging, Correlation-ID, ein globales Zeitbudget sowie explizite Idempotency Keys für schreibende Operationen hinzu."},
-        {"id": "git-workflow", "title": "7 · Git macht die Änderung nachvollziehbar", "body": "Ein sauberer Zyklus lautet: kleinen Scope wählen → Branch oder klaren Commit-Kontext prüfen → Änderung und Tests gemeinsam implementieren → `git diff` lesen → nur beabsichtigte Dateien stagen → präzise committen → CI beobachten. Secrets, lokale Umgebungen und generierte Artefakte gehören nicht ins Repository. Gute Commits erklären eine überprüfbare Veränderung, etwa `Handle 429 responses with bounded backoff`, nicht `update stuff`."},
-        {"id": "failure-modes", "title": "8 · Typische API-Fehlerbilder", "body": "\n".join(f"- {x}" for x in bp["failures"]) + "\n\nZu jedem Fehlerbild gehören drei Artefakte: ein reproduzierbarer Request, die tatsächliche Response inklusive relevanter Header und eine Entscheidung, ob der Fehler permanent, temporär oder unbekannt ist."},
-    ])
-    return sections
+    status_reference = "\n\n".join(status_md)
+    reference = _chapter(
+        "status-codes", "5 · HTTP-Statuscodes als Arbeitsreferenz",
+        "Wichtige Informations-, Erfolgs-, Redirect-, Client- und Servercodes mit Situationen.",
+        f"""## Statuscodes sind Steuerinformationen
+
+Der Code beschreibt das Ergebnis der Operation aus Sicht des Servers. Er wird zusammen mit Methode, Headern, Body und API-Vertrag interpretiert. Dieselbe Zahl kann ohne diesen Kontext falsch verstanden werden.
+
+{status_reference}
+
+## So lernst du die Codes
+
+Lerne nicht nur Zahl und Namen. Erkläre für jeden Code: Welcher Request löst ihn aus? Welche Header oder Body-Felder sind relevant? Darf exakt derselbe Request wiederholt werden? Muss Nutzer, Client oder Serverzustand verändert werden? Welches Log beweist den Fall?
+
+## Häufige Verwechslungen
+
+- `401` bedeutet fehlende oder ungültige Authentifizierung; `403` fehlende Berechtigung trotz bekannter Identität.
+- `400` betrifft einen grundsätzlich ungültigen Request; `422` eine lesbare, aber fachlich nicht akzeptierte Nutzlast.
+- `302` kann historisch die Methode verändern; `307` und `308` erhalten Methode und Body.
+- `500` stammt aus der Anwendung; `502` und `504` beschreiben Gatewayprobleme mit einem Downstream.
+- `202` ist noch kein abgeschlossenes Ergebnis. Der Client benötigt einen Statuspfad.""",
+        24,
+        ("Was gehört zur Interpretation eines Statuscodes?", ["Methode, Header, Body und API-Vertrag", "Nur die letzte Ziffer", "Nur die URL-Länge", "Die Browserfarbe"], 0, "Der Code ist Teil einer vollständigen Response."),
+        "Erstelle für jeden Code einen realistischen Request, die Response und die nächste Clientaktion.",
+        ["Statuscodes steuern Zustandsübergänge", "Nicht jeder Fehler ist retrybar", "202 und 204 brauchen besonderes Verhalten"],
+    )
+    decisions = _chapter(
+        "status-decisions", "6 · Vom Statuscode zur Cliententscheidung",
+        "Parsen, authentifizieren, korrigieren, warten, wiederholen oder abbrechen.",
+        """## Entscheidungsmatrix
+
+| Situation | Richtige Reaktion | Nicht tun |
+|---|---|---|
+| `2xx` mit Body | Content-Type und Schema prüfen, dann parsen | Erfolg mit fachlicher Korrektheit gleichsetzen |
+| `204` | Erfolg ohne Body verarbeiten | `response.json()` aufrufen |
+| `401` | Token erneuern oder neu authentifizieren | Secret loggen oder unendlich wiederholen |
+| `403` | Berechtigung oder Policy korrigieren | Token-Refresh als Universalfix |
+| `404` | Pfad und Ressourcen-ID prüfen | den gesamten Dienst als ausgefallen behandeln |
+| `409` | Zustand laden, Idempotenz/Version prüfen | denselben Write blind wiederholen |
+| `422` | Feldfehler anzeigen und Payload korrigieren | Backoff anwenden |
+| `429` | `Retry-After`, Quota und Budget beachten | enge Retry-Schleife |
+| `502/503/504` | begrenzter Retry, sofern sicher | alle Ebenen unabhängig retryn lassen |
+
+## Retry-Entscheidung
+
+Ein Retry ist nur sinnvoll, wenn der Fehler wahrscheinlich temporär, die Operation sicher wiederholbar und genug Gesamtzeit übrig ist. GET ist typischerweise idempotent; POST kann Duplikate erzeugen. Für Writes helfen Idempotency Keys, eindeutige Business-Schlüssel und serverseitige Deduplizierung.
+
+## Fehlerübersetzung
+
+Der HTTP-Adapter übersetzt technische Responses in kontrollierte Anwendungsergebnisse wie `authentication_required`, `validation_error` oder `temporarily_unavailable`. Für Diagnose bleiben Request-ID und technische Ursache erhalten.
+
+## Zeitbudget
+
+Connect Timeout, Read Timeout, Retries und Verarbeitung teilen sich ein Gesamtbudget. Drei Versuche zu je zehn Sekunden passen nicht zu einem Nutzer-SLO von fünf Sekunden.""",
+        18,
+        ("Wann ist ein Retry vertretbar?", ["Bei temporärem Fehler, sicherer Wiederholung und Restbudget", "Bei jedem 4xx", "Unbegrenzt bei POST", "Ohne Telemetrie"], 0, "Retrybarkeit hängt von Fehlerklasse, Idempotenz und Budget ab."),
+        "Entwirf Pseudocode für 204, 401, 403, 409, 422, 429 und 503 mit globalem Zeitbudget.",
+        ["Codes werden in Domänenzustände übersetzt", "Retry braucht Idempotenz", "Permanente Fehler benötigen Korrektur"],
+    )
+    client = _chapter(
+        "robust-client", "7 · Einen robusten Python-API-Client bauen",
+        "Timeouts, Validierung, begrenzte Retries, Idempotenz und Telemetrie.",
+        """## Referenzimplementierung
+
+```python
+import random
+import time
+import requests
+
+RETRYABLE = {429, 502, 503, 504}
+
+def get_json(url: str, attempts: int = 3) -> dict:
+    for attempt in range(attempts):
+        response = requests.get(url, timeout=(3.05, 10))
+        if response.status_code == 204:
+            return {}
+        if response.status_code in RETRYABLE:
+            if attempt + 1 == attempts:
+                response.raise_for_status()
+            base = float(response.headers.get("Retry-After", 2 ** attempt))
+            time.sleep(min(base + random.uniform(0, 0.25), 30))
+            continue
+        response.raise_for_status()
+        if "application/json" not in response.headers.get("Content-Type", ""):
+            raise ValueError("expected JSON response")
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("expected a JSON object")
+        return payload
+    raise RuntimeError("retry loop exhausted")
+```
+
+## Was der Code richtig macht
+
+Er trennt Connect- und Read-Timeout, behandelt 204, wiederholt nur ausgewählte temporäre Fehler, begrenzt Versuche, respektiert `Retry-After`, fügt Jitter hinzu und validiert Content-Type sowie grobe Antwortform.
+
+## Was noch fehlt
+
+Für Produktion fehlen globales Deadline-Budget, Connection Pooling, typisiertes Schema, Correlation-ID, strukturierte Metriken, gezielte Exception-Übersetzung und Tests mit kontrolliertem HTTP-Fake. Bei Writes kommen Idempotency Key und Behandlung unklarer Ergebnisse hinzu: Nach einem Timeout kann der Server bereits geschrieben haben.
+
+## Testfälle
+
+Teste 200 mit gültigem JSON, 204, falschen Content-Type, ungültiges Schema, 401 ohne Retry, 429 mit Retry-After, 503 bis zum Budgetende und Netzwerk-Timeout. Prüfe Rückgabe, Anzahl und Abstand der Versuche.""",
+        22,
+        ("Was ist bei POST nach Read Timeout gefährlich?", ["Der Server könnte geschrieben haben, obwohl keine Antwort ankam", "POST ist immer idempotent", "Timeout bedeutet Rollback", "JSON ist garantiert"], 0, "Ein unklares Write-Ergebnis benötigt Idempotenz oder Zustandsprüfung."),
+        "Implementiere injizierbare Session und Sleep-Funktion; teste 204, 401, 429 und erschöpften 503-Retry.",
+        ["Timeouts sind Vertragsbestandteil", "JSON braucht Schema-Validierung", "Unklare Writes brauchen Idempotenz"],
+    )
+    git = _chapter(
+        "git-workflow", "8 · Git-Workflow für sichere API-Änderungen",
+        "Kleine Commits, Review-Evidenz, CI und Secret Hygiene.",
+        """## Git ist Nachvollziehbarkeit
+
+Ein Commit verbindet eine Änderung mit Begründung und Nachweisen. Ein sinnvoller Zyklus lautet: Scope prüfen → klaren Commit-Kontext wählen → Verhalten und Tests gemeinsam ändern → `git diff` lesen → nur beabsichtigte Dateien stagen → präzise committen → CI beobachten.
+
+## API-Änderungen reviewbar machen
+
+Ändere Vertrag, Client, Tests und Dokumentation gemeinsam. Beschreibe Rückwärtskompatibilität. Neue Pflichtfelder, Codes oder Retryregeln können Downstreams brechen. Fixtures und Contract Tests machen Verhalten sichtbar.
+
+## Gute Commits
+
+`Handle 429 responses with bounded backoff` beschreibt Verhalten; `update stuff` nicht. Ein Commit ist klein genug für Ursache und Wirkung, aber vollständig genug für grüne Tests.
+
+## Secrets
+
+Tokens, `.env`, virtuelle Umgebungen, lokale Daten und Caches gehören nicht ins Repository. Wurde ein Secret committed, reicht späteres Löschen nicht: Es bleibt in der Historie und muss rotiert werden.
+
+## Review-Check
+
+Prüfe Diff, Codes, Timeout, Retrybudget, Idempotenz, Logging, Tests, Dokumentation und Rollback. Ein Merge ist eine Betriebsentscheidung.""",
+        16,
+        ("Warum ein committetes Token rotieren?", ["Es bleibt in der Git-Historie", "Git speichert keine Historie", "CI löscht es sicher", "Der Dateiname schützt es"], 0, "Ein offengelegtes Secret gilt als kompromittiert."),
+        "Plane einen Commit für 429-Behandlung mit Dateien, Tests, Message, Review und Rollback.",
+        ["Commits verbinden Änderung und Evidenz", "Verträge brauchen Kompatibilitätsprüfung", "Secret Exposure verlangt Rotation"],
+    )
+    return sections[:4] + [reference, decisions, client, git] + sections[4:]
 
 
 def build_lesson_lab(lesson: dict[str, Any]) -> dict[str, Any]:
@@ -390,8 +1074,17 @@ def validate_labs(tracks: list[dict[str, Any]]) -> list[str]:
                 continue
             lab = build_lesson_lab(lesson)
             section_ids = {section["id"] for section in lab["sections"]}
-            if len(lab["sections"]) < 6:
+            if len(lab["sections"]) < 10:
                 errors.append(f"too few theory sections: {lesson_id}")
+            if sum(len(section["body"].split()) for section in lab["sections"]) < 2_200:
+                errors.append(f"theory too shallow: {lesson_id}")
+            for section in lab["sections"]:
+                if not {"summary", "minutes", "check", "practice", "takeaways"}.issubset(section):
+                    errors.append(f"incomplete chapter contract: {lesson_id}/{section.get('id', '?')}")
+                    continue
+                check = section["check"]
+                if not 0 <= check["answer"] < len(check["options"]):
+                    errors.append(f"invalid chapter check: {lesson_id}/{section['id']}")
             if len(lab["quiz"]) < 4:
                 errors.append(f"too few quiz questions: {lesson_id}")
             for question in lab["quiz"]:

@@ -3,7 +3,13 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from lesson_content import HTTP_STATUS_GROUPS, LESSON_BLUEPRINTS, build_lesson_lab, validate_labs
+from lesson_content import (
+    HTTP_STATUS_GROUPS,
+    LESSON_BLUEPRINTS,
+    LESSON_EXTENSIONS,
+    build_lesson_lab,
+    validate_labs,
+)
 
 
 ROOT = Path(__file__).parents[1]
@@ -32,12 +38,32 @@ def test_each_quiz_and_practice_task_links_back_to_theory() -> None:
             lab = build_lesson_lab(lesson)
             section_ids = {section["id"] for section in lab["sections"]}
 
-            assert len(lab["sections"]) >= 6
+            assert len(lab["sections"]) >= 10
             assert len(lab["quiz"]) >= 4
             assert all(question["source"] in section_ids for question in lab["quiz"])
             assert lab["debug"]["source"] in section_ids
             assert len(lab["build"]["steps"]) == 5
             assert len(lab["build"]["rubric"]) >= 5
+
+
+def test_every_lesson_meets_professional_depth_contract() -> None:
+    lessons = [lesson for track in load_tracks() for lesson in track["lessons"]]
+
+    assert set(LESSON_EXTENSIONS) == set(LESSON_BLUEPRINTS)
+    for lesson in lessons:
+        lab = build_lesson_lab(lesson)
+        total_words = sum(len(section["body"].split()) for section in lab["sections"])
+
+        assert total_words >= 2_200, lesson["id"]
+        assert all(section["minutes"] >= 8 for section in lab["sections"])
+        assert all(len(section["summary"].split()) >= 5 for section in lab["sections"])
+        assert all(len(section["practice"].split()) >= 8 for section in lab["sections"])
+        assert all(len(section["takeaways"]) >= 3 for section in lab["sections"])
+        for section in lab["sections"]:
+            check = section["check"]
+            assert len(check["options"]) == 4
+            assert 0 <= check["answer"] < len(check["options"])
+            assert len(check["why"].split()) >= 5
 
 
 def test_http_reference_covers_success_client_and_server_cases() -> None:
@@ -60,4 +86,6 @@ def test_http_quiz_includes_rate_limit_scenario() -> None:
 
     assert any("429" in question["q"] for question in lab["quiz"])
     assert any("Statuscodes" in section["title"] for section in lab["sections"])
+    assert len(lab["sections"]) >= 14
+    assert sum(len(section["body"].split()) for section in lab["sections"]) >= 3_500
     assert "ReadTimeout" in lab["debug"]["symptom"]
