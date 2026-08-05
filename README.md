@@ -47,3 +47,16 @@ python -m pytest -q
 ```
 
 Der Sidebar-Buildstempel zeigt, ob das aktuelle Deployment geladen wurde. Unerwartete Laufzeitfehler werden im Einstiegspunkt abgefangen und mit Fehler-ID sowie Traceback in der App sichtbar gemacht; dadurch bleibt die eigentliche Ursache auch ohne Zugriff auf die Cloud-Konsole diagnostizierbar.
+
+## Community-Cloud-Deployment
+
+Die Produktionsabhängigkeiten sind bewusst kompatibel gepinnt. Insbesondere bleibt
+`starlette==0.49.3` fixiert, solange Streamlit 1.60 dessen 0.x-GZip-Schnittstelle
+verwendet. Starlette 1.x würde den ASGI-Server bereits vor Ausführung von `app.py`
+beenden; ein App-interner Fehlerbildschirm kann diesen Startfehler daher nicht
+abfangen.
+
+Für ein reproduzierbares Deployment wird Python 3.12 empfohlen. Community Cloud
+installiert Änderungen an `requirements.txt` automatisch neu. Falls nach einer
+Abhängigkeitsänderung noch ein alter Build läuft, unter **Manage app** einmal
+**Reboot app** ausführen.
