@@ -242,6 +242,11 @@ if "progress" not in st.session_state:
     update_streak()
 if "navigation_page" not in st.session_state:
     st.session_state.navigation_page = "Dashboard"
+if "pending_navigation" in st.session_state:
+    # A widget-backed Session State key may only be changed before the widget
+    # is instantiated. Navigation buttons therefore queue the destination for
+    # the next rerun instead of mutating the radio key in their click run.
+    st.session_state.navigation_page = st.session_state.pop("pending_navigation")
 if "selected_lesson" not in st.session_state:
     st.session_state.selected_lesson = None
 
@@ -305,7 +310,7 @@ if page == "Dashboard":
         with col2:
             if st.button("Mission starten", type="primary", use_container_width=True):
                 st.session_state.selected_lesson = lesson_key(t,l)
-                st.session_state.navigation_page = "Lesson Lab"
+                st.session_state.pending_navigation = "Lesson Lab"
                 st.rerun()
     else:
         st.success("Alle Curriculum-Lektionen abgeschlossen. Beginne jetzt die Portfolio-Projekte.")
@@ -343,7 +348,7 @@ elif page == "Skill Tree":
                 with c2:
                     if st.button("Öffnen", key=f"open-{key}", use_container_width=True):
                         st.session_state.selected_lesson = key
-                        st.session_state.navigation_page = "Lesson Lab"
+                        st.session_state.pending_navigation = "Lesson Lab"
                         st.rerun()
 
 elif page == "Lesson Lab":
